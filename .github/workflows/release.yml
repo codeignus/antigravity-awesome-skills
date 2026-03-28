@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - artifact_name: awesome-skills-cli-linux-x64
+            rust_target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - artifact_name: awesome-skills-cli-macos-x64
+            rust_target: x86_64-apple-darwin
+            os: macos-15-intel
+          - artifact_name: awesome-skills-cli-macos-arm64
+            rust_target: aarch64-apple-darwin
+            os: macos-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - uses: Swatinem/rust-cache@v2
+
+      - run: cargo build --locked --release --target ${{ matrix.rust_target }} --bin awesome-skills-cli
+
+      - run: mv target/${{ matrix.rust_target }}/release/awesome-skills-cli target/${{ matrix.rust_target }}/release/${{ matrix.artifact_name }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: target/${{ matrix.rust_target }}/release/${{ matrix.artifact_name }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - run: |
+          cd artifacts
+          sha256sum awesome-skills-cli-* > ../checksums.txt
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          files: |
+            artifacts/awesome-skills-cli-*
+            checksums.txt
+          generate_release_notes: true

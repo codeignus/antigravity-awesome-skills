@@ -1,23 +1,55 @@
-# Antigravity Awesome Skills
+# Awesome Skills CLI
 
-> Installable skill library of 1,329+ agentic skills for AI coding assistants.
-
-This is a fork of [sickn33/antigravity-awesome-skills](https://github.com/sickn33/antigravity-awesome-skills) stripped down to the essentials: skills and index data. All CI, tooling, documentation, and release infrastructure lives in the upstream repo.
+> Skill library and Rust CLI for AI coding assistants.
 
 ## What's Here
 
 | Path | Purpose |
 |---|---|
 | `skills/` | 1,329+ skill directories, each containing a `SKILL.md` playbook |
-| `skills_index.json` | Flat index of all skills with metadata (id, category, description, tags) |
-| `data/bundles.json` | Curated skill groups by role (Web Wizard, Security Engineer, etc.) |
+| `skills_index.json` | Flat index of all skills with metadata |
+| `data/bundles.json` | Curated skill groups by role |
 | `data/editorial-bundles.json` | Editorial bundle definitions |
 | `data/aliases.json` | Skill name aliases for discoverability |
 | `data/catalog.json` | Catalog data for search |
+| `.github/workflows/release.yml` | Release pipeline for Rust binary artifacts |
 
 ## How to Use
 
-Copy any skill's `SKILL.md` into your AI tool's skills directory:
+### CLI
+
+Install the `awesome-skills-cli` binary and use commands directly:
+
+```bash
+awesome-skills-cli add brainstorming --path ~/.claude/skills
+awesome-skills-cli search "testing"
+awesome-skills-cli info brainstorming
+awesome-skills-cli update
+awesome-skills-cli version
+```
+
+**User-facing commands:**
+
+| Command | Description |
+|---|---|
+| `list [--category X]` | List all skills (full detail, meant for human browsing) |
+| `search <query>` | Fuzzy search skills by name or keyword |
+| `info <skill-id>` | Show detailed info for one skill |
+| `add <skill-id...> --path <dir>` | Copy one or more skills to a directory |
+| `update` | Self-update to the latest release |
+| `version` | Print version info |
+
+**Agent-facing command:**
+
+| Command | Description |
+|---|---|
+| `catalog-for-agent` | Output a condensed JSON list of all skills with only essential fields (id, name, category, description) — designed to save tokens when called by an LLM agent |
+
+Use `list` when you (the user) want to browse skills. Use `catalog-for-agent` in your agent's configuration or MCP setup so the LLM can discover available skills efficiently.
+
+### Git Clone (Manual)
+
+Clone the repo and copy any skill's `SKILL.md` into your AI tool's skills directory:
 
 - **Claude Code**: `.claude/skills/`
 - **Gemini CLI**: `.gemini/skills/`
@@ -26,15 +58,23 @@ Copy any skill's `SKILL.md` into your AI tool's skills directory:
 - **OpenCode**: `.agents/skills/`
 - **Kiro**: `.kiro/skills/`
 
-Example:
-
 ```bash
-cp -r skills/brainstorming ~/.claude/skills/
+git clone https://github.com/anomalyco/antigravity-awesome-skills.git
+cp -r antigravity-awesome-skills/skills/brainstorming ~/.claude/skills/
 ```
 
-Then reference it in your prompts:
+## Development
 
-> Use @brainstorming to plan a SaaS MVP.
+```bash
+cargo test
+cargo build --release
+```
+
+Lint workflows with [actionlint](https://github.com/rhysd/actionlint):
+
+```bash
+actionlint
+```
 
 ## Skill Categories
 
@@ -49,11 +89,9 @@ Then reference it in your prompts:
 | Testing | TDD, test design, fixes, QA workflows |
 | Workflow | Automation, orchestration, jobs, agents |
 
-## Upstream
+## Releases
 
-For contributing, CI, releases, plugins, and full documentation, see the upstream repo:
-
-**[github.com/sickn33/antigravity-awesome-skills](https://github.com/sickn33/antigravity-awesome-skills)**
+Tagged releases build `awesome-skills-cli` with Cargo for Linux and macOS targets and publish the binaries plus SHA256 checksums as GitHub Release assets.
 
 ## License
 
