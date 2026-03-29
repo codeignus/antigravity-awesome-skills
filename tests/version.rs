@@ -15,7 +15,7 @@ fn version_prints_the_binary_version() {
 }
 
 #[test]
-fn help_mentions_offline_commands_and_the_add_rename() {
+fn help_mentions_offline_commands() {
     cargo_bin()
         .arg("--help")
         .assert()
@@ -25,8 +25,8 @@ fn help_mentions_offline_commands_and_the_add_rename() {
         .stdout(predicate::str::contains("catalog-for-agent"))
         .stdout(predicate::str::contains("info"))
         .stdout(predicate::str::contains("add"))
-        .stdout(predicate::str::contains("version"))
-        .stdout(predicate::str::contains("install").not());
+        .stdout(predicate::str::contains("setup"))
+        .stdout(predicate::str::contains("version"));
 }
 
 #[test]

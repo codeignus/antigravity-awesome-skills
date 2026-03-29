@@ -31,3 +31,12 @@ fn search_multi_word_query_returns_results() {
         .success()
         .stdout(predicate::str::contains("ab-test-setup"));
 }
+
+#[test]
+fn search_does_not_include_meta_skills() {
+    cargo_bin()
+        .args(["search", "recommend-awesome-skills"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No skills matching"));
+}

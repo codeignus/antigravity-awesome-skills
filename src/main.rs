@@ -1,8 +1,6 @@
 mod commands;
+mod meta_repository;
 mod repository;
-
-use std::env;
-use std::process;
 
 use anyhow::Result;
 use clap::Parser;
@@ -19,17 +17,9 @@ struct Cli {
 }
 
 fn main() {
-    let raw_args: Vec<String> = env::args().collect();
-    if let Some(subcommand) = raw_args.get(1)
-        && subcommand == "install"
-    {
-        eprintln!("The install command was renamed. Use `awesome-skills-cli add --path <dir> <skill-id...>` instead.");
-        process::exit(1);
-    }
-
     if let Err(err) = run() {
         eprintln!("{err}");
-        process::exit(1);
+        std::process::exit(1);
     }
 }
 
@@ -43,6 +33,7 @@ fn run() -> Result<()> {
         Commands::CatalogForAgent => commands::catalog_for_agent::run(&repo),
         Commands::Info { skill_id } => commands::info::run(&repo, &skill_id),
         Commands::Add { skill_ids, path } => commands::add::run(&repo, &skill_ids, &path),
+        Commands::Setup { skill_ids, path } => commands::setup::run(&skill_ids, &path),
         Commands::Update => commands::update::run(),
         Commands::Version => commands::version::run(),
     }

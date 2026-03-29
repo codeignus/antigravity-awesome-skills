@@ -12,7 +12,9 @@ fn list_reads_embedded_skill_catalog() {
         .assert()
         .success()
         .stdout(predicate::str::contains("ab-test-setup"))
-        .stdout(predicate::str::contains("marketing"));
+        .stdout(predicate::str::contains("marketing"))
+        .stdout(predicate::str::contains("awesome-skills-cli").not())
+        .stdout(predicate::str::contains("recommend-awesome-skills").not());
 }
 
 #[test]

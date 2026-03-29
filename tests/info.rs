@@ -46,3 +46,14 @@ fn unknown_skill_reports_a_clear_error_path() {
             "Skill not found: definitely-not-a-real-skill",
         ));
 }
+
+#[test]
+fn info_does_not_resolve_meta_skills_from_setup_catalog() {
+    cargo_bin()
+        .args(["info", "awesome-skills-cli"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "Skill not found: awesome-skills-cli",
+        ));
+}

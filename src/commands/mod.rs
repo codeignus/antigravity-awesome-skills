@@ -3,6 +3,7 @@ pub mod catalog_for_agent;
 pub mod info;
 pub mod list;
 pub mod search;
+pub mod setup;
 pub mod update;
 pub mod version;
 
@@ -25,6 +26,11 @@ pub enum Commands {
     },
     Add {
         #[arg(required = true)]
+        skill_ids: Vec<String>,
+        #[arg(long)]
+        path: PathBuf,
+    },
+    Setup {
         skill_ids: Vec<String>,
         #[arg(long)]
         path: PathBuf,
