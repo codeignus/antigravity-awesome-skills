@@ -1,6 +1,6 @@
 ---
 name: recommend-awesome-skills
-description: Use when the user asks for awesome skill recommendations, wants help choosing skills for an environment or project, or wants skills installed.
+description: Use when user asks for awesome skill recommendations, wants help choosing skills for an environment or project, or wants skills installed.
 ---
 
 # recommend-awesome-skills
@@ -10,9 +10,9 @@ Use this skill when the user wants help choosing awesome skills for their curren
 Primary workflow:
 1. Ask context questions first.
 2. If the user has not already specified install scope, ask whether installation should be project-based or global before loading the catalog.
-3. Decide the target directory before loading the catalog.
-4. Once the context and install scope are clear, prefer using a subagent to run `awesome-skills-cli catalog-for-agent` and return only a focused shortlist.
-5. Recommend a focused set of skills with short reasons.
+3. Decide on target directory before loading the catalog.
+4. Once context and install scope are clear, run chunked map-reduce catalog workflow.
+5. Present aggregated shortlist with reasons.
 6. Ask for confirmation before installing anything.
 7. If the user confirms, install with `awesome-skills-cli add --path <dir> <skill-id...>`.
 
@@ -24,16 +24,42 @@ Question order:
 
 Installation directory guidance:
 - Recommend `.agents/skills` first when the environment is unknown or mixed because it is the most universal and highest-priority default.
-- If the environment is known, suggest the matching directory such as `.claude/skills`, `.gemini/skills`, `.codex/skills`, `.cursor/skills`, or `.kiro/skills`.
+- If the environment is known, suggest a matching directory such as `.claude/skills`, `.gemini/skills`, `.codex/skills`, `.cursor/skills`, or `.kiro/skills`.
 - For project-based setup, prefer a repo-local directory.
 - For global setup, prefer the environment's home-directory skills folder.
 
+## Chunked Map-Reduce Workflow
+
+Use `awesome-skills-cli catalog-for-agent --limit 250 --offset X` to pull the catalog in sequential chunks.
+
+### Step 1: Probe for total
+
+Run `awesome-skills-cli catalog-for-agent --limit 1 --offset 0`. The command emits pagination metadata on stderr in the format:
+
+```
+catalog-for-agent: total=<N> offset=0 limit=1 returned=1 truncated=false has_more=true
+```
+
+Extract `total` from stderr. Compute the number of chunks: `ceil(total / 250)`. For example, `total=1329` with limit 250 produces 6 chunks at offsets 0, 250, 500, 750, 1000, 1250.
+
+### Step 2: Map — dispatch chunks
+
+Dispatch one subagent per chunk. Each subagent receives the user's requirements and the chunk JSON and returns only a shortlist of relevant skill IDs with one-line reasons.
+
+Where parallel subagents are not available, process chunks sequentially in the main agent: evaluate each chunk, keep only the shortlist, discard the chunk data before moving to the next.
+
+### Step 3: Reduce — aggregate shortlists
+
+Collect all chunk-level shortlists. Deduplicate by skill ID. Compare relevance across chunks. Produce the final best set before presenting anything to the user.
+
+### Step 4: Present and confirm
+
+Show the aggregated recommendations with reasons. Ask for confirmation before installing.
+
 Catalog usage rules:
-- Do not fetch `catalog-for-agent` before asking the install-scope and context questions.
+- Do not fetch the catalog before asking the install-scope and context questions.
 - Do not dump the entire catalog to the user.
 - Use the condensed catalog only to choose a small, relevant shortlist.
-- Prefer running the catalog search in a subagent so the large metadata load does not consume the main session context beyond the final shortlist.
-- If the catalog was loaded in the main session and the conversation starts drifting into unrelated work, warn that the large catalog context should not be carried into other tasks.
 - Keep recommendations tied to the user's current work, not generic popularity.
 
 Installation rules:

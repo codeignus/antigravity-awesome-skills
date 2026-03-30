@@ -1,9 +1,9 @@
-use std::fs;
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 
 use crate::meta_repository::MetaRepository;
+use crate::skill_io;
 
 pub fn run(skill_ids: &[String], path: &Path) -> Result<()> {
     let repository = MetaRepository::global();
@@ -33,17 +33,7 @@ pub fn run(skill_ids: &[String], path: &Path) -> Result<()> {
             .get_skill_content(skill.id)
             .with_context(|| format!("meta skill content not available for: {}", skill.id))?;
 
-        let skill_dir = path.join(skill.id);
-        fs::create_dir_all(&skill_dir)
-            .with_context(|| format!("failed to create {}", skill_dir.display()))?;
-        fs::write(skill_dir.join("SKILL.md"), content)
-            .with_context(|| format!("failed to write {}", skill_dir.join("SKILL.md").display()))?;
-        println!(
-            "Added \"{}\" ({}) to {}/SKILL.md",
-            skill.name,
-            skill.id,
-            skill_dir.display()
-        );
+        skill_io::write_skill(path, skill.id, skill.name, content)?;
     }
 
     Ok(())

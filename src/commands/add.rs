@@ -1,20 +1,16 @@
-use std::fs;
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 
 use crate::repository::Repository;
+use crate::skill_io;
 
 pub fn run(repository: &Repository, skill_ids: &[String], path: &Path) -> Result<()> {
     let mut errors = Vec::new();
 
     for skill_id in skill_ids {
         let Some(skill) = repository.get_skill(skill_id) else {
-            let mut message = format!("Skill not found: {skill_id}");
-            if let Some(suggestion) = repository.suggest_skill_id(skill_id) {
-                message.push_str(&format!("\nDid you mean: {suggestion}?"));
-            }
-            errors.push(message);
+            errors.push(repository.not_found_error(skill_id).to_string());
             continue;
         };
 
@@ -23,17 +19,9 @@ pub fn run(repository: &Repository, skill_ids: &[String], path: &Path) -> Result
             continue;
         };
 
-        let skill_dir = path.join(&skill.id);
-        fs::create_dir_all(&skill_dir)
-            .with_context(|| format!("failed to create {}", skill_dir.display()))?;
-        fs::write(skill_dir.join("SKILL.md"), content)
-            .with_context(|| format!("failed to write {}", skill_dir.join("SKILL.md").display()))?;
-        println!(
-            "Added \"{}\" ({}) to {}/SKILL.md",
-            skill.name,
-            skill.id,
-            skill_dir.display()
-        );
+        if let Err(e) = skill_io::write_skill(path, &skill.id, &skill.name, content) {
+            errors.push(e.to_string());
+        }
     }
 
     if errors.is_empty() {

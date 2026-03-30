@@ -1,35 +1,30 @@
-use std::env;
-use std::io::{self, Write};
+use anyhow::Result;
 
-use anyhow::{Context, Result};
+use crate::output;
 
 pub fn run() -> Result<()> {
-    println!("awesome-skills-cli v{}", env!("CARGO_PKG_VERSION"));
-    io::stdout().flush().context("failed to flush stdout")?;
+    let version = env!("CARGO_PKG_VERSION");
+    output::eprint(format_args!("awesome-skills-cli v{version}"))?;
     Ok(())
 }
 
-pub fn current_platform_suffix() -> String {
-    let os = match env::consts::OS {
-        "macos" => "macos",
-        other => other,
-    };
-    let arch = match env::consts::ARCH {
-        "x86_64" => "x64",
-        "aarch64" => "arm64",
-        other => other,
-    };
-    format!("{os}-{arch}")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn platform_suffix_matches_release_convention() {
-        let suffix = current_platform_suffix();
-        assert!(!suffix.is_empty());
-        assert!(suffix.contains('-'));
-    }
+pub fn current_platform_suffix() -> &'static str {
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    { "linux-x64" }
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    { "linux-arm64" }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    { "macos-x64" }
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    { "macos-arm64" }
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+    { "windows-x64.exe" }
+    #[cfg(not(any(
+        all(target_os = "linux", target_arch = "x86_64"),
+        all(target_os = "linux", target_arch = "aarch64"),
+        all(target_os = "macos", target_arch = "x86_64"),
+        all(target_os = "macos", target_arch = "aarch64"),
+        all(target_os = "windows", target_arch = "x86_64"),
+    )))]
+    { "unknown" }
 }

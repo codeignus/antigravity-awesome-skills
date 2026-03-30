@@ -1,10 +1,19 @@
 use std::fs;
+use std::process::Command;
 
-use assert_cmd::Command;
 use tempfile::tempdir;
 
 fn cargo_bin() -> Command {
-    Command::cargo_bin("awesome-skills-cli").expect("binary builds for integration tests")
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_awesome-skills-cli"));
+    cmd.env_clear();
+    cmd
+}
+
+fn run_success(args: &[&str]) {
+    let mut cmd = cargo_bin();
+    cmd.args(args);
+    let output = cmd.output().expect("binary runs");
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
 }
 
 #[test]
@@ -15,14 +24,11 @@ fn setup_writes_all_embedded_meta_skills_to_target_path() {
     let recommend_skill = fs::read_to_string("src/skills/recommend-awesome-skills/SKILL.md")
         .expect("recommend meta skill markdown available from repo");
 
-    cargo_bin()
-        .args([
-            "setup",
-            "--path",
-            temp_dir.path().to_str().expect("temp path is utf-8"),
-        ])
-        .assert()
-        .success();
+    run_success(&[
+        "setup",
+        "--path",
+        temp_dir.path().to_str().expect("temp path is utf-8"),
+    ]);
 
     let written_cli =
         fs::read_to_string(temp_dir.path().join("awesome-skills-cli").join("SKILL.md"))
@@ -45,59 +51,59 @@ fn setup_creates_nested_target_directory() {
     let nested = temp_dir.path().join("deep").join("nested").join("dir");
     assert!(!nested.exists());
 
-    cargo_bin()
-        .args([
-            "setup",
-            "--path",
-            nested.to_str().expect("nested path is utf-8"),
-        ])
-        .assert()
-        .success();
+    run_success(&[
+        "setup",
+        "--path",
+        nested.to_str().expect("nested path is utf-8"),
+    ]);
 
     assert!(nested.join("awesome-skills-cli").join("SKILL.md").exists());
-    assert!(nested
-        .join("recommend-awesome-skills")
-        .join("SKILL.md")
-        .exists());
+    assert!(
+        nested
+            .join("recommend-awesome-skills")
+            .join("SKILL.md")
+            .exists()
+    );
 }
 
 #[test]
 fn setup_with_skill_id_only_installs_that_meta_skill() {
     let temp_dir = tempdir().expect("temp dir for setup test");
 
-    cargo_bin()
-        .args([
-            "setup",
-            "awesome-skills-cli",
-            "--path",
-            temp_dir.path().to_str().expect("temp path is utf-8"),
-        ])
-        .assert()
-        .success();
+    run_success(&[
+        "setup",
+        "awesome-skills-cli",
+        "--path",
+        temp_dir.path().to_str().expect("temp path is utf-8"),
+    ]);
 
-    assert!(temp_dir
-        .path()
-        .join("awesome-skills-cli")
-        .join("SKILL.md")
-        .exists());
-    assert!(!temp_dir
-        .path()
-        .join("recommend-awesome-skills")
-        .join("SKILL.md")
-        .exists());
+    assert!(
+        temp_dir
+            .path()
+            .join("awesome-skills-cli")
+            .join("SKILL.md")
+            .exists()
+    );
+    assert!(
+        !temp_dir
+            .path()
+            .join("recommend-awesome-skills")
+            .join("SKILL.md")
+            .exists()
+    );
 }
 
 #[test]
 fn setup_unknown_meta_skill_returns_failure() {
     let temp_dir = tempdir().expect("temp dir for setup test");
 
-    cargo_bin()
-        .args([
-            "setup",
-            "not-a-real-meta-skill",
-            "--path",
-            temp_dir.path().to_str().expect("temp path is utf-8"),
-        ])
-        .assert()
-        .failure();
+    let mut cmd = cargo_bin();
+    cmd.args([
+        "setup",
+        "not-a-real-meta-skill",
+        "--path",
+        temp_dir.path().to_str().expect("temp path is utf-8"),
+    ]);
+    let output = cmd.output().expect("binary runs");
+    assert!(!output.status.success());
 }

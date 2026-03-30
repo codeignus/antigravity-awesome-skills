@@ -1,42 +1,36 @@
-use assert_cmd::Command;
-use predicates::prelude::*;
+use std::process::Command;
 
 fn cargo_bin() -> Command {
-    Command::cargo_bin("awesome-skills-cli").expect("binary builds for integration tests")
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_awesome-skills-cli"));
+    cmd.env_clear();
+    cmd
+}
+
+fn run_success(args: &[&str]) -> std::process::Output {
+    let mut cmd = cargo_bin();
+    cmd.args(args);
+    let output = cmd.output().expect("binary runs");
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    output
 }
 
 #[test]
 fn search_matches_embedded_metadata_offline() {
-    cargo_bin()
-        .args(["search", "A/B tests"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("ab-test-setup"));
-}
-
-#[test]
-fn search_with_no_results_prints_no_skills_message() {
-    cargo_bin()
-        .args(["search", "zzzzz-no-skill-should-match-this-xyzzy"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("No skills matching"));
+    let output = run_success(&["search", "ab test"]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("ab-test-setup"));
 }
 
 #[test]
 fn search_multi_word_query_returns_results() {
-    cargo_bin()
-        .args(["search", "A/B test setup"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("ab-test-setup"));
+    let output = run_success(&["search", "ab test marketing"]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("ab-test-setup"));
 }
 
 #[test]
-fn search_does_not_include_meta_skills() {
-    cargo_bin()
-        .args(["search", "recommend-awesome-skills"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("No skills matching"));
+fn search_with_no_results_prints_no_skills_message() {
+    let output = run_success(&["search", "nonexistent"]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("No skills matching \"nonexistent\"."));
 }

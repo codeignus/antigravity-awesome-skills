@@ -1,11 +1,15 @@
+use std::cmp::Ordering;
 use std::env;
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, Read};
+use std::mem;
+use std::path::PathBuf;
 
 use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 
 use super::version::current_platform_suffix;
+use crate::output;
 
 pub fn run() -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
@@ -13,33 +17,39 @@ pub fn run() -> Result<()> {
     let mut response = ureq::get(api_url)
         .header("User-Agent", "awesome-skills-cli")
         .call()
-        .context("failed to check for updates")?;
+        .map_err(|e| anyhow::anyhow!("failed to check for updates: {e}"))?;
 
-    let release: GitHubRelease = response
+    let body_str = response
         .body_mut()
-        .read_json()
-        .context("failed to parse GitHub release response")?;
+        .read_to_string()
+        .map_err(|e| anyhow::anyhow!("failed to read response body: {e}"))?;
+    let release: GitHubRelease =
+        serde_json::from_str(&body_str).context("failed to parse GitHub release response")?;
 
     let suffix = current_platform_suffix();
-    let plan = plan_update(&release, current_version, &suffix)?;
+    let plan = plan_update(&release, current_version, suffix)?;
     let UpdatePlan::Ready {
         latest_version,
         asset_name,
         download_url,
     } = plan
     else {
-        println!("You're already on the latest version (v{current_version}).");
+        output::eprint(format_args!(
+            "You're already on the latest version (v{current_version})."
+        ))?;
         return Ok(());
     };
 
     let current_exe = env::current_exe().context("failed to determine current executable")?;
-    println!("New version available: v{latest_version} (current: v{current_version})");
-    println!(
+    output::eprint(format_args!(
+        "New version available: v{latest_version} (current: v{current_version})"
+    ))?;
+    output::eprint(format_args!(
         "Will download {asset_name} and replace {}",
         current_exe.display()
-    );
-    print!("Continue? [y/N] ");
-    io::stdout().flush().context("failed to flush prompt")?;
+    ))?;
+    output::print(format_args!("Continue? [y/N] "))?;
+    output::flush().context("failed to flush prompt")?;
 
     let mut answer = String::new();
     io::stdin()
@@ -47,34 +57,50 @@ pub fn run() -> Result<()> {
         .context("failed to read input")?;
     let answer = answer.trim().to_lowercase();
     if answer != "y" && answer != "yes" {
-        println!("Update cancelled.");
+        output::eprint(format_args!("Update cancelled."))?;
         return Ok(());
     }
 
-    let bytes = ureq::get(&download_url)
+    let mut download_response = ureq::get(&download_url)
         .header("User-Agent", "awesome-skills-cli")
         .call()
-        .context("failed to download release asset")?
+        .map_err(|e| anyhow::anyhow!("failed to download release asset: {e}"))?;
+    let mut bytes = Vec::new();
+    download_response
         .body_mut()
-        .read_to_vec()
-        .context("failed to read downloaded release asset")?;
+        .as_reader()
+        .read_to_end(&mut bytes)
+        .map_err(|e| anyhow::anyhow!("failed to read downloaded release asset: {e}"))?;
 
     let temp_path = current_exe.with_extension("download");
+    let guard = TempFile(temp_path.clone());
     fs::write(&temp_path, bytes)
         .with_context(|| format!("failed to write {}", temp_path.display()))?;
 
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
-        let mut permissions = fs::metadata(&temp_path)?.permissions();
+        let mut permissions = fs::metadata(&temp_path)
+            .with_context(|| format!("failed to read metadata for {}", temp_path.display()))?
+            .permissions();
         permissions.set_mode(0o755);
-        fs::set_permissions(&temp_path, permissions)?;
+        fs::set_permissions(&temp_path, permissions)
+            .with_context(|| format!("failed to set permissions on {}", temp_path.display()))?;
     }
 
     fs::rename(&temp_path, &current_exe)
         .with_context(|| format!("failed to replace {}", current_exe.display()))?;
-    println!("Updated to v{latest_version} successfully!");
+    mem::forget(guard);
+    output::eprint(format_args!("Updated to v{latest_version} successfully!"))?;
     Ok(())
+}
+
+struct TempFile(PathBuf);
+
+impl Drop for TempFile {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
 }
 
 enum UpdatePlan {
@@ -100,7 +126,7 @@ struct GitHubAsset {
 
 fn plan_update(release: &GitHubRelease, current_version: &str, suffix: &str) -> Result<UpdatePlan> {
     let latest_version = release.tag_name.trim_start_matches('v');
-    if compare_versions(latest_version, current_version) <= 0 {
+    if compare_versions(latest_version, current_version) != Ordering::Greater {
         return Ok(UpdatePlan::UpToDate);
     }
 
@@ -118,20 +144,16 @@ fn plan_update(release: &GitHubRelease, current_version: &str, suffix: &str) -> 
     })
 }
 
-fn compare_versions(a: &str, b: &str) -> i32 {
-    let left = a.split('.').map(|part| part.parse::<u32>().unwrap_or(0));
-    let right = b.split('.').map(|part| part.parse::<u32>().unwrap_or(0));
-
-    for (left, right) in left.zip(right).chain(std::iter::repeat((0, 0))).take(3) {
-        if left > right {
-            return 1;
-        }
-        if left < right {
-            return -1;
+fn compare_versions(a: &str, b: &str) -> Ordering {
+    let left = a.split('.').map(|p| p.parse::<u32>().unwrap_or(0));
+    let right = b.split('.').map(|p| p.parse::<u32>().unwrap_or(0));
+    for (l, r) in left.zip(right).chain(std::iter::repeat((0, 0))).take(3) {
+        match l.cmp(&r) {
+            Ordering::Equal => continue,
+            other => return other,
         }
     }
-
-    0
+    Ordering::Equal
 }
 
 #[cfg(test)]
@@ -165,8 +187,8 @@ mod tests {
 
     #[test]
     fn compare_versions_orders_semver_triplets() {
-        assert_eq!(compare_versions("9.0.0", "9.0.0"), 0);
-        assert_eq!(compare_versions("9.0.1", "9.0.0"), 1);
-        assert_eq!(compare_versions("8.9.9", "9.0.0"), -1);
+        assert_eq!(compare_versions("9.0.0", "9.0.0"), Ordering::Equal);
+        assert_eq!(compare_versions("9.0.1", "9.0.0"), Ordering::Greater);
+        assert_eq!(compare_versions("8.9.9", "9.0.0"), Ordering::Less);
     }
 }

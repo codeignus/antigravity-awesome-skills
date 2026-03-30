@@ -9,7 +9,20 @@ pub mod version;
 
 use std::path::PathBuf;
 
+use anyhow::{anyhow, Result};
 use clap::Subcommand;
+
+fn parse_limit(value: &str) -> Result<usize> {
+    let limit = value
+        .parse::<usize>()
+        .map_err(|_| anyhow!("invalid value '{value}' for '--limit'"))?;
+
+    if limit == 0 {
+        return Err(anyhow!("--limit must be at least 1"));
+    }
+
+    Ok(limit)
+}
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
@@ -20,7 +33,12 @@ pub enum Commands {
     Search {
         query: String,
     },
-    CatalogForAgent,
+    CatalogForAgent {
+        #[arg(long, value_parser = parse_limit)]
+        limit: usize,
+        #[arg(long)]
+        offset: usize,
+    },
     Info {
         skill_id: String,
     },

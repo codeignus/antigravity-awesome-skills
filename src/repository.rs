@@ -2,23 +2,21 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::OnceLock;
 
 use anyhow::{anyhow, Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use strsim::levenshtein;
 
 const SKILLS_INDEX_JSON: &str = include_str!("../skills_index.json");
 const ALIASES_JSON: &str = include_str!("../data/aliases.json");
-const BUNDLES_JSON: &str = include_str!("../data/bundles.json");
-const EDITORIAL_BUNDLES_JSON: &str = include_str!("../data/editorial-bundles.json");
-const CATALOG_JSON: &str = include_str!("../data/catalog.json");
 
 include!(concat!(env!("OUT_DIR"), "/embedded_skills.rs"));
 
 static REPOSITORY: OnceLock<Repository> = OnceLock::new();
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize)]
 pub struct SkillEntry {
     pub id: String,
-    pub path: String,
+    #[allow(dead_code)]
+    path: String,
     pub category: String,
     pub name: String,
     pub description: String,
@@ -32,7 +30,8 @@ struct AliasFile {
     aliases: HashMap<String, String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
+#[allow(dead_code)]
 pub struct CatalogEntry<'a> {
     pub id: &'a str,
     pub category: &'a str,
@@ -54,12 +53,6 @@ impl Repository {
         let aliases = serde_json::from_str::<AliasFile>(ALIASES_JSON)
             .context("failed to parse embedded aliases.json")?
             .aliases;
-        let _: serde_json::Value =
-            serde_json::from_str(BUNDLES_JSON).context("failed to parse embedded bundles.json")?;
-        let _: serde_json::Value = serde_json::from_str(EDITORIAL_BUNDLES_JSON)
-            .context("failed to parse embedded editorial-bundles.json")?;
-        let _: serde_json::Value =
-            serde_json::from_str(CATALOG_JSON).context("failed to parse embedded catalog.json")?;
         let contents = EMBEDDED_SKILLS
             .iter()
             .copied()
@@ -77,22 +70,19 @@ impl Repository {
         if let Some(repo) = REPOSITORY.get() {
             return Ok(repo);
         }
-
         let repo = Self::load()?;
         let _ = REPOSITORY.set(repo);
-        REPOSITORY
-            .get()
-            .ok_or_else(|| anyhow!("failed to initialize repository"))
+        Ok(REPOSITORY.get().unwrap())
     }
 
     pub fn all_skills(&self) -> &[SkillEntry] {
         &self.skills
     }
 
-    pub fn categories(&self) -> Vec<String> {
-        let mut categories = BTreeSet::new();
+    pub fn categories(&self) -> Vec<&str> {
+        let mut categories: BTreeSet<&str> = BTreeSet::new();
         for skill in &self.skills {
-            categories.insert(skill.category.clone());
+            categories.insert(&skill.category);
         }
         categories.into_iter().collect()
     }
@@ -112,6 +102,13 @@ impl Repository {
     pub fn get_skill_content(&self, id: &str) -> Option<&'static str> {
         let resolved = self.resolve_skill_id(id);
         self.contents.get(resolved).copied()
+    }
+
+    pub fn not_found_error(&self, id: &str) -> anyhow::Error {
+        let suggestion = self.suggest_skill_id(id)
+            .map(|s| format!("\nDid you mean: {s}?"))
+            .unwrap_or_default();
+        anyhow!("Skill not found: {id}{suggestion}")
     }
 
     pub fn search(&self, query: &str) -> Vec<&SkillEntry> {
@@ -177,7 +174,7 @@ impl Repository {
             .iter()
             .find(|(alias, _)| alias.starts_with(id) || id.starts_with(alias.as_str()))
         {
-            return Some(if alias == &id {
+            return Some(if alias.as_str() == id {
                 canonical.as_str()
             } else {
                 alias.as_str()
@@ -199,16 +196,14 @@ impl Repository {
     }
 }
 
-pub fn truncate(value: &str, max_len: usize) -> String {
-    if value.chars().count() <= max_len {
-        return value.to_string();
-    }
-
-    let truncated = value
-        .chars()
-        .take(max_len.saturating_sub(3))
-        .collect::<String>();
-    format!("{truncated}...")
+pub fn format_skill_row(id: &str, category: &str, description: &str, risk: &str) -> String {
+    let desc = if description.chars().count() <= 60 {
+        description.to_string()
+    } else {
+        let truncated: String = description.chars().take(57).collect();
+        format!("{truncated}...")
+    };
+    format!("{id}\t{category}\t{desc}\t{risk}")
 }
 
 #[cfg(test)]
@@ -225,21 +220,14 @@ mod tests {
     }
 
     #[test]
-    fn repository_embeds_supporting_json_files() {
-        let bundles: serde_json::Value = serde_json::from_str(BUNDLES_JSON).expect("bundles parse");
-        let editorial: serde_json::Value =
-            serde_json::from_str(EDITORIAL_BUNDLES_JSON).expect("editorial bundles parse");
-        let catalog: serde_json::Value =
-            serde_json::from_str(CATALOG_JSON).expect("catalog parses");
-
-        assert!(!bundles.is_null());
-        assert!(!editorial.is_null());
-        assert!(!catalog.is_null());
-    }
-
-    #[test]
-    fn truncate_adds_ellipsis_when_needed() {
-        assert_eq!(truncate("short", 10), "short");
-        assert_eq!(truncate("abcdefghijklmnopqrstuvwxyz", 10), "abcdefg...");
+    fn format_skill_row_truncates_long_descriptions() {
+        assert_eq!(
+            format_skill_row("id", "cat", "short", "low"),
+            "id\tcat\tshort\tlow"
+        );
+        assert_eq!(
+            format_skill_row("id", "cat", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", "low"),
+            "id\tcat\tabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcde...\tlow"
+        );
     }
 }

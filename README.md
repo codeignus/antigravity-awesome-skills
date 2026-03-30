@@ -28,6 +28,8 @@ awesome-skills-cli search "testing"
 awesome-skills-cli info brainstorming
 awesome-skills-cli update
 awesome-skills-cli version
+awesome-skills-cli catalog-for-agent --limit 250 --offset 0
+awesome-skills-cli catalog-for-agent --limit 250 --offset 250
 ```
 
 **User-facing commands:**
@@ -46,7 +48,7 @@ awesome-skills-cli version
 
 | Command | Description |
 |---|---|
-| `catalog-for-agent` | Output a condensed JSON list of all skills with only essential fields (id, name, category, description) — designed to save tokens when called by an LLM agent |
+| `catalog-for-agent --limit N --offset M` | Output a condensed JSON array slice on stdout and pagination metadata on stderr for agent batching |
 
 Use `list` when you (the user) want to browse skills. Use `catalog-for-agent` in your agent's configuration or MCP setup so the LLM can discover available skills efficiently.
 
@@ -81,7 +83,3 @@ actionlint
 ## Releases
 
 Tagged releases build `awesome-skills-cli` with Cargo for Linux and macOS targets and publish the binaries plus SHA256 checksums as GitHub Release assets.
-
-## License
-
-MIT

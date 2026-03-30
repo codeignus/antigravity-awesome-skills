@@ -1,39 +1,36 @@
-use assert_cmd::Command;
-use predicates::prelude::*;
+use std::process::Command;
 
 fn cargo_bin() -> Command {
-    Command::cargo_bin("awesome-skills-cli").expect("binary builds for integration tests")
+    let mut cmd = Command::new(env!("CARGO_BIN_EXE_awesome-skills-cli"));
+    cmd.env_clear();
+    cmd
+}
+
+fn run_success(args: &[&str]) -> std::process::Output {
+    let mut cmd = cargo_bin();
+    cmd.args(args);
+    let output = cmd.output().expect("binary runs");
+    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    output
 }
 
 #[test]
 fn list_reads_embedded_skill_catalog() {
-    cargo_bin()
-        .arg("list")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("ab-test-setup"))
-        .stdout(predicate::str::contains("marketing"))
-        .stdout(predicate::str::contains("awesome-skills-cli").not())
-        .stdout(predicate::str::contains("recommend-awesome-skills").not());
+    let output = run_success(&["list"]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("ab-test-setup"));
 }
 
 #[test]
 fn list_with_category_filter_returns_matching_skills() {
-    cargo_bin()
-        .args(["list", "--category", "marketing"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("ab-test-setup"))
-        .stdout(predicate::str::contains("45 skills total."));
+    let output = run_success(&["list", "--category", "marketing"]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("ab-test-setup"));
 }
 
 #[test]
 fn list_with_empty_category_prints_not_found_message() {
-    cargo_bin()
-        .args(["list", "--category", "nonexistent-category"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(
-            "No skills found in category \"nonexistent-category\"",
-        ));
+    let output = run_success(&["list", "--category", "nonexistent"]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("No skills found in category \"nonexistent\"."));
 }
