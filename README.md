@@ -18,7 +18,21 @@
 
 ### CLI
 
-Install the `awesome-skills-cli` binary and use commands directly:
+**Quick install (Linux / macOS):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/codeignus/awesome-skills-cli/main/scripts/install.sh | bash
+```
+
+Or install manually:
+
+```bash
+# Download the latest binary for your platform from the
+# [latest GitHub release](https://github.com/codeignus/awesome-skills-cli/releases/latest),
+# make it executable, and place it somewhere on your PATH (e.g. ~/.local/bin).
+```
+
+**Usage:**
 
 ```bash
 awesome-skills-cli add brainstorming --path ~/.claude/skills

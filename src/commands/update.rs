@@ -13,7 +13,7 @@ use crate::output;
 
 pub fn run() -> Result<()> {
     let current_version = env!("CARGO_PKG_VERSION");
-    let api_url = "https://api.github.com/repos/sickn33/antigravity-awesome-skills/releases/latest";
+    let api_url = "https://api.github.com/repos/codeignus/awesome-skills-cli/releases/latest";
     let mut response = ureq::get(api_url)
         .header("User-Agent", "awesome-skills-cli")
         .call()
