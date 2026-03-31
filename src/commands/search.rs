@@ -13,12 +13,7 @@ pub fn run(repository: &Repository, query: &str) -> Result<()> {
     for skill in &results {
         output::eprint(format_args!(
             "{}",
-            format_skill_row(
-                &skill.id,
-                &skill.category,
-                &skill.description,
-                &skill.risk
-            )
+            format_skill_row(&skill.id, &skill.category, &skill.description, &skill.risk)
         ))?;
     }
 

@@ -1,5 +1,4 @@
 pub mod add;
-pub mod catalog_for_agent;
 pub mod info;
 pub mod list;
 pub mod search;
@@ -29,15 +28,13 @@ pub enum Commands {
     List {
         #[arg(long)]
         category: Option<String>,
+        #[arg(long, value_parser = parse_limit)]
+        limit: Option<usize>,
+        #[arg(long, default_value_t = 0)]
+        offset: usize,
     },
     Search {
         query: String,
-    },
-    CatalogForAgent {
-        #[arg(long, value_parser = parse_limit)]
-        limit: usize,
-        #[arg(long)]
-        offset: usize,
     },
     Info {
         skill_id: String,

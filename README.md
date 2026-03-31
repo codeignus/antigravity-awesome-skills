@@ -42,15 +42,14 @@ awesome-skills-cli search "testing"
 awesome-skills-cli info brainstorming
 awesome-skills-cli update
 awesome-skills-cli version
-awesome-skills-cli catalog-for-agent --limit 250 --offset 0
-awesome-skills-cli catalog-for-agent --limit 250 --offset 250
+awesome-skills-cli list --limit 200 --offset 100
 ```
 
 **User-facing commands:**
 
 | Command | Description |
 |---|---|
-| `list [--category X]` | List all skills (full detail, meant for human browsing) |
+| `list [--category X] [--limit N] [--offset M]` | List skills in plain text (works for both humans and agents; pass `--limit` and `--offset` for paginated batching, metadata on stderr) |
 | `search <query>` | Fuzzy search skills by name or keyword |
 | `info <skill-id>` | Show detailed info for one skill |
 | `add <skill-id...> --path <dir>` | Copy one or more skills to a directory |
@@ -58,15 +57,9 @@ awesome-skills-cli catalog-for-agent --limit 250 --offset 250
 | `update` | Self-update to the latest release |
 | `version` | Print version info |
 
-**Agent-facing command:**
+Use `list` to browse or paginate the skill catalog. Pass `--limit` and `--offset` for agent batching; pagination metadata is printed on stderr.
 
-| Command | Description |
-|---|---|
-| `catalog-for-agent --limit N --offset M` | Output a condensed JSON array slice on stdout and pagination metadata on stderr for agent batching |
-
-Use `list` when you (the user) want to browse skills. Use `catalog-for-agent` in your agent's configuration or MCP setup so the LLM can discover available skills efficiently.
-
-Use `setup` when you want the CLI to install its own embedded meta skills into a skills directory. These meta skills live under `src/skills/` in the repo, are bundled into the binary separately, and are intentionally excluded from the main indexed catalog used by `list`, `search`, `catalog-for-agent`, and `info`.
+Use `setup` when you want the CLI to install its own embedded meta skills into a skills directory. These meta skills live under `src/skills/` in the repo, are bundled into the binary separately, and are intentionally excluded from the main indexed catalog used by `list`, `search`, and `info`.
 
 ## Development
 

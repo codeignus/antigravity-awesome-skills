@@ -1,47 +1,42 @@
 use anyhow::Result;
 
 use crate::output;
-use crate::repository::{format_skill_row, Repository};
+use crate::repository::Repository;
 
-pub fn run(repository: &Repository, category: Option<&str>) -> Result<()> {
+pub fn run(
+    repository: &Repository,
+    category: Option<&str>,
+    limit: Option<usize>,
+    offset: usize,
+) -> Result<()> {
     let skills = if let Some(category) = category {
         repository.skills_by_category(category)
     } else {
         repository.all_skills().iter().collect()
     };
 
-    if skills.is_empty() {
-        if let Some(category) = category {
-            output::eprint(format_args!("No skills found in category \"{category}\"."))?;
-            output::eprint(format_args!(
-                "Available categories: {}",
-                repository.categories().join(", ")
-            ))?;
-        } else {
-            output::eprint(format_args!("No skills available."))?;
-        }
-        return Ok(());
-    }
+    let total = skills.len();
+    let page: Vec<_> = skills
+        .into_iter()
+        .skip(offset)
+        .take(limit.unwrap_or(usize::MAX))
+        .collect();
+    let returned = page.len();
+    let has_more = offset + returned < total;
+    let effective_limit = limit.unwrap_or(returned);
 
-    for skill in &skills {
-        output::eprint(format_args!(
-            "{}",
-            format_skill_row(&skill.id, &skill.category, &skill.description, &skill.risk)
+    output::print(format_args!("id | category | risk | description"))?;
+    for skill in &page {
+        let desc = skill.description.replace('\n', " ");
+        output::print(format_args!(
+            "{} | {} | {} | {}",
+            skill.id, skill.category, skill.risk, desc
         ))?;
     }
 
-    output::eblank_line()?;
     output::eprint(format_args!(
-        "{} skill{} total.",
-        skills.len(),
-        if skills.len() == 1 { "" } else { "s" }
+        "total={total} offset={offset} limit={effective_limit} returned={returned} has_more={has_more}"
     ))?;
-    if category.is_none() {
-        let categories = repository.categories();
-        output::eprint(format_args!(
-            "Categories: {}",
-            categories.join(", ")
-        ))?;
-    }
+
     Ok(())
 }

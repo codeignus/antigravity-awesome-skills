@@ -11,46 +11,45 @@ Primary workflow:
 1. Ask context questions first.
 2. If the user has not already specified install scope, ask whether installation should be project-based or global before loading the catalog.
 3. Decide on target directory before loading the catalog.
-4. Once context and install scope are clear, run chunked map-reduce catalog workflow.
+4. Once context and install scope are clear, determine whether to use targeted search or the full catalog workflow.
 5. Present aggregated shortlist with reasons.
 6. Ask for confirmation before installing anything.
 7. If the user confirms, install with `awesome-skills-cli add --path <dir> <skill-id...>`.
 
-Question order:
+Question order (SKIP any already answered by context or prompt):
 1. What kind of work are you doing right now?
 2. Which coding environment or agent are you using?
-3. If the user has not already said, ask: should I set this up for just this project or globally for your machine?
+3. CRITICAL: Should I set this up for just this project or globally for your machine?
 4. If needed, confirm the target directory.
 
-Installation directory guidance:
-- Recommend `.agents/skills` first when the environment is unknown or mixed because it is the most universal and highest-priority default.
-- If the environment is known, suggest a matching directory such as `.claude/skills`, `.gemini/skills`, `.codex/skills`, `.cursor/skills`, or `.kiro/skills`.
-- For project-based setup, prefer a repo-local directory.
-- For global setup, prefer the environment's home-directory skills folder.
+Installation directory defaults:
+- **Global (mixed/unknown env)**: `~/.agents/skills` (highest-priority universal default)
+- **Global (known env)**: e.g., `~/.claude/skills`, `~/.gemini/skills`, `~/.cursor/skills`
+- **Project-based**: Repo-local directory (e.g., `./.agents/skills`)
 
-## Chunked Map-Reduce Workflow
+## Catalog Search vs Browse
 
-Use `awesome-skills-cli catalog-for-agent --limit 250 --offset X` to pull the catalog in sequential chunks.
+### Explicit Searches
+Use `awesome-skills-cli search <keyword>` **ONLY** when the user explicitly asks for a narrow, specific tool or workflow by name (e.g., "I want a brainstorming skill", "get me the postgres skill").
+Do NOT use this just because you see specific frameworks like `vite` or `playwright` in their workspace. Environmental context should be used for filtering during a browse, not for triggering individual search commands.
 
-### Step 1: Probe for total
+### General Discovery
+Use `awesome-skills-cli list --limit 250 --offset <N>` to evaluate the *entire* catalog against the user's stack when they ask for general recommendations (e.g., "what should I install?").
 
-Run `awesome-skills-cli catalog-for-agent --limit 1 --offset 0`. The command emits pagination metadata on stderr in the format:
+**CRITICAL BROWSING RULES:**
+1. Limit MUST NEVER exceed `250`.
+2. **DO NOT** use `jq`, `python`, or bash scripts to parse outputs.
+3. To bypass terminal truncation, **MUST** dump chunks to a file (e.g. `> /tmp/chunk.txt`) and read via your native file-reading tool (`read_file`/`view_file`).
 
-```
-catalog-for-agent: total=<N> offset=0 limit=1 returned=1 truncated=false has_more=true
-```
+#### Step 1: Probe for total
+Run `awesome-skills-cli list --limit 1 --offset 0 2>&1 >/dev/null` to cleanly surface metadata. Extract `total` to compute 250-item chunks (offsets 0, 250, 500...).
 
-Extract `total` from stderr. Compute the number of chunks: `ceil(total / 250)`. For example, `total=1329` with limit 250 produces 6 chunks at offsets 0, 250, 500, 750, 1000, 1250.
+#### Step 2: Map (Chunk to file & read)
+**STRONGLY ADVISE** dispatching one subagent per chunk to preserve your context window. Each runs `list --limit 250 --offset <N> > /tmp/chunk_<N>.txt`, reads it natively, and returns a shortlist.
+**If subagents are unavailable**, process sequentially: dump to `/tmp/chunk.txt`, read into context, extract relevant IDs, and critically, purge the chunk data from your memory before pulling the next offset.
 
-### Step 2: Map — dispatch chunks
-
-Dispatch one subagent per chunk. Each subagent receives the user's requirements and the chunk JSON and returns only a shortlist of relevant skill IDs with one-line reasons.
-
-Where parallel subagents are not available, process chunks sequentially in the main agent: evaluate each chunk, keep only the shortlist, discard the chunk data before moving to the next.
-
-### Step 3: Reduce — aggregate shortlists
-
-Collect all chunk-level shortlists. Deduplicate by skill ID. Compare relevance across chunks. Produce the final best set before presenting anything to the user.
+#### Step 3: Reduce
+Collect and deduplicate shortlists. Use `has_more` metadata to know when chunks are exhausted. Produce the final best set.
 
 ### Step 4: Present and confirm
 

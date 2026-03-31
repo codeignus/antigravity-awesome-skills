@@ -79,6 +79,7 @@ impl Repository {
         &self.skills
     }
 
+    #[allow(dead_code)]
     pub fn categories(&self) -> Vec<&str> {
         let mut categories: BTreeSet<&str> = BTreeSet::new();
         for skill in &self.skills {
@@ -105,7 +106,8 @@ impl Repository {
     }
 
     pub fn not_found_error(&self, id: &str) -> anyhow::Error {
-        let suggestion = self.suggest_skill_id(id)
+        let suggestion = self
+            .suggest_skill_id(id)
             .map(|s| format!("\nDid you mean: {s}?"))
             .unwrap_or_default();
         anyhow!("Skill not found: {id}{suggestion}")
@@ -226,7 +228,12 @@ mod tests {
             "id\tcat\tshort\tlow"
         );
         assert_eq!(
-            format_skill_row("id", "cat", "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz", "low"),
+            format_skill_row(
+                "id",
+                "cat",
+                "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz",
+                "low"
+            ),
             "id\tcat\tabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcde...\tlow"
         );
     }

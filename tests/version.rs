@@ -10,7 +10,11 @@ fn run_success(args: &[&str]) -> std::process::Output {
     let mut cmd = cargo_bin();
     cmd.args(args);
     let output = cmd.output().expect("binary runs");
-    assert!(output.status.success(), "stderr: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     output
 }
 
@@ -33,7 +37,7 @@ fn help_mentions_offline_commands() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("list"));
     assert!(stdout.contains("search"));
-    assert!(stdout.contains("catalog-for-agent"));
+    assert!(!stdout.contains("catalog-for-agent"));
     assert!(stdout.contains("info"));
     assert!(stdout.contains("add"));
     assert!(stdout.contains("setup"));
@@ -45,5 +49,8 @@ fn unknown_subcommand_returns_error() {
     let output = run(&["not-a-real-subcommand"]);
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains("error") || stderr.contains("unrecognized"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("error") || stderr.contains("unrecognized"),
+        "stderr: {stderr}"
+    );
 }

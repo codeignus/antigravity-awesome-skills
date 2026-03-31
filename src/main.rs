@@ -43,11 +43,12 @@ fn run() -> Result<()> {
     let repo = Repository::global()?;
 
     match cli.command {
-        Commands::List { category } => commands::list::run(repo, category.as_deref()),
+        Commands::List {
+            category,
+            limit,
+            offset,
+        } => commands::list::run(repo, category.as_deref(), limit, offset),
         Commands::Search { query } => commands::search::run(repo, &query),
-        Commands::CatalogForAgent { limit, offset } => {
-            commands::catalog_for_agent::run(repo, limit, offset)
-        }
         Commands::Info { skill_id } => commands::info::run(repo, &skill_id),
         Commands::Add { skill_ids, path } => commands::add::run(repo, &skill_ids, &path),
         Commands::Setup { skill_ids, path } => commands::setup::run(&skill_ids, &path),
